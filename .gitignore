@@ -1,0 +1,37 @@
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# --- Swift / mcpeer ---
+.build/
+.swiftpm/
+xcuserdata/
+
+# --- gckdtls bridge binary (build from tools/gckdtls.swift; not shipped) ---
+bin/
+
+# --- Python ---
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# --- Editors ---
+.idea/
+.vscode/
+*.swp
+*~
+
+# --- Local runtime config (commit only the template mc.env.example) ---
+mc.env
+mc/.env
+.env
+
+# --- Capture evidence & scratch (regenerate with tools/capture-run.sh; not shipped) ---
+caps*/
+*.pcap
+*.pcapng
+*.log
+.hn_session.txt

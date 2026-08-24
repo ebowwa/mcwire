@@ -1,0 +1,37 @@
+{
+ "session_id": "2112a442",
+ "challenge_prefix": "6a8395ba",
+ "challenges": {
+  "A": "6a8395ba08937d77121a082af21c980a9efaef6e14954063e245cdcf01d836e1",
+  "B": "6a8395bac51d03a6135cc5e84765ea4c5a10b4e0891508ea3e039eb090d830e9"
+ },
+ "cipher_suites": [
+  "c019",
+  "c018",
+  "006d",
+  "003a",
+  "006c",
+  "0034"
+ ],
+ "groups": [
+  "0017",
+  "0018",
+  "0019"
+ ],
+ "client_pub": {
+  "X": "3ba09386810e5cb7a5717403ae43cc9ac4616bcc0c7888d086e54e2702b39597",
+  "Y": "2157429e759edd9aa1c517c08d316c1a7679de0fe0bb0a60d2c4768dfa24e8df"
+ },
+ "server_pub": {
+  "X": "4eddcf0ed50f4ed432d3c863346b87a0aedad1adf86aca0d6bb6a1acb76c3aa5",
+  "Y": "1d89b703125faec2a9225151761b853917cafe759196f43526c0788204aa7212"
+ },
+ "tokens": {
+  "A": "53ace299",
+  "B": "39b97b2c"
+ },
+ "blob_tokens": [
+  "2ae7330c",
+  "53ace299"
+ ]
+}

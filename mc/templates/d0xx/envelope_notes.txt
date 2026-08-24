@@ -1,0 +1,22 @@
+d0xx envelope / handshake layout (from caps-cli connected pair):
+
+Envelope (every d0xx datagram):
+  d0 16|17|14  ff          : family d0, record-type (16=handshake, 17=app-data, 14=ccs-ish), magic ff? (then...)
+  (re-split): d0 | 16/17/14 | fe ff => [family][type][fe ff magic]
+  ff 00 00 | 00 00 00 00   : flags + 4B datagram counter
+  <2B len>                  : body length (e.g. 0067=103, 005d=93)
+  body per handshake type:
+    01 (ClientHello-ish): 0100 005B [0012 zeros-ish] [32B challenge] suites/groups tail
+      cipher suites: c019 c018 006d 003a 006c 0034 (Apple-private; ChaCha20Poly1305 + AES-GCM)
+      groups: 0017 0018 0019 (P-256, P-384, P-521) via 000a ext
+    02 (ServerHello-ish): 0200 0051 ... [2x32B] ...
+    d0 16 ... 00 40 <64B>   : handshake carrying 64B body (ciphertext? or key_share)
+    d014 feff 0000 .. 000n 0001 01 : ack/ccs datagram (15B constant-ish)
+    d017 feff 0001 0000 <seq4> <len2 0x50/0x60/0x80/0xa0/0xe0> <ciphertext+tag>
+      app-data records; lengths 0100? no: 0x50=80B data region; JSON envelopes live inside
+      ICV/tag look: payload chars high-entropy (AEAD) — ChaCha20-Poly1305 16B tag, 12B nonce?
+
+Hello phase (units at 16401/16402), fresh per session:
+  0001003c ... sessionid 2112a442 + tokenA(tokenB) + TLV 8001/8003/8004/8005/8008/8009
+  8009 0057 blob carries per-peer 8B tokens (e.g. 2ae7330c + 53ace299) + machine addrs
+  tokens in the d0xx handshake challenge region begin with constant 6a8395ba
