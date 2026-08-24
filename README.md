@@ -30,6 +30,25 @@ foreign peer.
 > by the app's receive layer; Apple's own stack fragments above that).
 > Next: the Kotlin/Android port validation.
 
+## Proof
+
+- **`docs/evidence/R49-live-session.md`** — verbatim record of a live
+  Mac-to-Mac session (2026-08-24): mcwire (browser) on one office Mac joined a
+  real `.optional` `MultipeerChannel` on another — DTLS handshake complete,
+  c1xx identity complete, the app's own `kind:"hello"` JSON arrived at the
+  foreign peer, 36k+ acks flowed back, and the framework's own GCKSession log
+  shows the foreign participant as a full routing-table member.
+- **`tools/verify-session.sh`** — one-command self-check with only this
+  repo's components: builds `mcpeer`, drives the full foreign-stack walk
+  (discovery → TCP browser flow → plists → ICE start), and asserts each
+  marker. `RESULT: PASS` is reproduced on any macOS box.
+
+Run the self-check:
+
+```sh
+./tools/verify-session.sh mc-probe      # uses shipped mcpeer oracle
+```
+
 ## Status
 
 | Layer | Status | Where |

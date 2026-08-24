@@ -6,11 +6,14 @@ import MultipeerConnectivity
 //
 //   mcpeer advertise <type> [--name N] [--bytes N] [--payload HEX] [--info k=v,...]
 //   mcpeer browse    <type> [--name N] [--bytes N] [--payload HEX] [--no-invite]
-//                          [--period S] [--required]
+//                          [--period S] [--required|--optional]
 //
 // Builds plaintext sessions by default (nil security identity + .none),
 // matching the typical `MCSession(peer:)` app. --required exercises the
 // identity handshake path (with a nil identity) for grammar coverage.
+// --optional mirrors the typical modern app channel (`.optional` data-plane
+// encryption — the plane mcwire's DTLS browser flow is validated against),
+// still with a nil security identity.
 // ---------------------------------------------------------------------------
 
 let defaultType = "mc-probe"
@@ -27,6 +30,7 @@ struct Opts {
     var period = defaultPeriod
     var invite = true
     var required = false
+    var optional = false
     var info = [String: String]()
 }
 
@@ -34,7 +38,7 @@ func usage() -> Never {
     print("""
     usage:
       mcpeer advertise <type> [--name N] [--bytes N] [--payload HEX] [--info k=v,...] [--required]
-      mcpeer browse    <type> [--name N] [--bytes N] [--payload HEX] [--period S] [--no-invite] [--required]
+      mcpeer browse    <type> [--name N] [--bytes N] [--payload HEX] [--period S] [--no-invite] [--required|--optional]
     """)
     exit(2)
 }
@@ -66,6 +70,7 @@ func parseArgs(_ args: [String]) -> Opts {
             }
         case "--no-invite": o.invite = false
         case "--required": o.required = true
+        case "--optional": o.optional = true
         default: usage()
         }
         i += 1
@@ -115,7 +120,8 @@ final class Prober: NSObject {
         self.opts = opts
         self.peerID = MCPeerID(displayName: opts.name)
         super.init()
-        let enc: MCEncryptionPreference = opts.required ? .required : .none
+        let enc: MCEncryptionPreference = opts.optional ? .optional
+            : (opts.required ? .required : .none)
         let s = MCSession(peer: peerID, securityIdentity: nil, encryptionPreference: enc)
         s.delegate = self
         self.session = s
@@ -129,7 +135,7 @@ final class Prober: NSObject {
             adv.delegate = self
             self.advertiser = adv
             adv.startAdvertisingPeer()
-            Log.t("ADVERTISE type=\(opts.type) info=\(opts.info) name=\(opts.name)")
+            Log.t("ADVERTISE type=\(opts.type) info=\(opts.info) name=\(opts.name) enc=\(opts.optional ? "optional" : (opts.required ? "required" : "none"))")
         } else {
             let br = MCNearbyServiceBrowser(peer: peerID, serviceType: opts.type)
             br.delegate = self
