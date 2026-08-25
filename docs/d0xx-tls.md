@@ -1908,3 +1908,42 @@ unchanged.
   day (0 STUN delivered while the framework logs show checks sent) —
   reboot clears it (untested today; the machine stayed up). The 8GB Air,
   with 2-3 processes, kept working — all final evidence runs used it.
+
+### R52 addendum — the app-level delivery forensics (same night)
+
+Live console streaming from the device + unified-log forensics on the
+oracle side pinned the exact death point of foreign DATA frames:
+
+- Our c105 frames ARRIVE and DECRYPT (GCK logs `Non-OSPF packet received
+  from participant <us> ... State=Connected DTLSState=DTLSConnected`), are
+  classified as data — and then dropped SILENTLY: the `MCSession Incoming
+  packet ... done callback` line (which fires 61× for a real peer's frames
+  in the same window) never fires for ours.
+- Ruled out by byte-comparison against the phone's live frames: composite
+  format ([my-pid4][peer-pid4] — confirmed correct in the server path),
+  CRC16/ARC, the 0500/070b markers, payload framing (no 0001 marker — the
+  phone's own delivered hello has none), seq fields (real frames also carry
+  0000).
+- Key negative: the receiving framework logs `OSPFParse err=InvalidDestination`
+  218× for the REAL peer's frames too — the classifier error is normal
+  noise, NOT the discriminator. The drop happens one layer later, silently,
+  in the AGP/reliable-delivery stage.
+- Found + defused a latent wiring hazard: `our_token8`/`peer_token8` state
+  slots are shared by consumers with different formats (c1xx builders
+  historically wanted raw identity tokens; c105 wants masked-pid composites).
+  In the DTLS-server path (our usual, pinned-high pid4) both happen to get
+  composites — which the live frames confirm is the CORRECT wire format for
+  everything in-tunnel (c101/c102/c105 all carry composites; the old
+  "full-token tokA" docstring was wrong). The client path
+  (`kick_if_client`) still stores raw tokens — a trap if we ever lose the
+  tie-break. Left as-is tonight, documented.
+- Instrumentation added: mcwire now prints the outbound c105 hex alongside
+  the inbound decrypted hex — the decisive byte-diff (ours-out vs
+  theirs-in, field by field) is one clean session away.
+
+Environment notes for the next session: this Air's GCK send path degraded
+after ~20 oracle processes (0 STUN delivered; reboot clears it, R48-class);
+stale mDNS records linger ~25s after kills; multiple simultaneous adverts
+(including the production app) contend for the browser — exactly one
+oracle on the network is the working configuration (4/4 tonight when it
+held).

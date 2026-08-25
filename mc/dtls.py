@@ -359,6 +359,7 @@ def _answer_c1xx(sock, dst, st, eng, plain):
         ch = st["chan"]
         for out in ch.on_data(plain):
             kind = "ack" if out[16] == 0x07 else "data"
+            print(f"[app] -> c105 {kind} hex: {out.hex()}")
             for rec in eng.send_plain(out):
                 try:
                     sock.sendto(b"\xd0" + rec, dst)
