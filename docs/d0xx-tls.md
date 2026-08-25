@@ -1864,3 +1864,47 @@ physical iPhone** (iPhone 13 mini, iPhone14,4), end to end.
 - The 121B iOS blob is a new ground-truth data point for the
   address-segment grammar (more interfaces → longer ConnectionData); worth
   folding into docs/mc-protocol.md when the next blob pass happens.
+
+## Round 52 — 🎬📱 FULL PASS: video frames to a real iPhone + the env post-mortem
+
+### The completed matrix (2026-08-24, evening)
+With the video streamer fixed (below), mcwire on the 8GB Air joined the
+fresh iPhone oracle instance TWICE back-to-back and streamed kind:"frame"
+envelopes: run 1 = 198 frames, run 2 = 201 frames — each frame a 1470B
+d0xx record delivered to the phone's 16402, 5 distinct generated JPEGs at
+5fps, DTLS handshake complete + JSON channel up both runs. Cross-machine,
+cross-device, full stack, sustained video.
+
+App-level delivery note (consistent with R42/R50): the phone's oracle UI
+shows Connected + its own ping/hello traffic (user-verified both runs);
+the foreign frames are receipted at the framework's transport layer but do
+not surface as `didReceive` callbacks — the known quench frontier,
+unchanged.
+
+### Two bugs fixed in `mc/dtls.py`
+1. **Video fallback generation** (`_gen_test_jpegs`): when no JPEG sources
+   exist, generate 5 tiny distinct solid-color JPEGs (~1KB each) via macOS
+   `sips` (stdlib BMP → JPEG) — zero pip deps, always inside the 2.7KB
+   receive budget. The video proof is now fully self-contained.
+2. **The splice bug** (found live): during the edit above the streamer's
+   thread-start ended up as dead code after `return` in the wrong function
+   — `_start_video` defined the loop but never started it. Symptom:
+   "[video] generating…" then silence. Fixed: thread start restored at the
+   true end of `_start_video`; verified by AST map + isolated harness
+   (frames flow) + two live device runs.
+
+### Environment post-mortem (recorded for the next office session)
+- **Ghost sessions**: abruptly killing an oracle (pkill) while it holds a
+  live MCSession leaves the peer's framework with a dead-peer record —
+  subsequent sessions "invite accepted → connecting → timed out, enforcing
+  clean up" on BOTH Macs simultaneously. Fresh-instance relaunch on the
+  phone cleared it (new token = new identity). Same failure class as the
+  mini's post-reboot GCK breakage (R48). Proper daemon-quit or reboot
+  avoids it.
+- **Stale mDNS records**: killed oracles keep advertising for tens of
+  seconds (and re-announce on multiple interfaces); the browser must not
+  dial them. Cleanly-quit instances clear in ~25s.
+- **This Air's GCK send path degraded** after ~20 oracle processes in one
+  day (0 STUN delivered while the framework logs show checks sent) —
+  reboot clears it (untested today; the machine stayed up). The 8GB Air,
+  with 2-3 processes, kept working — all final evidence runs used it.

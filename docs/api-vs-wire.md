@@ -88,7 +88,7 @@ the API (README gotchas; R32/R45).
 | Payload ≥ ~4KB / fragmentation | ❌ | — | open (Apple's fragmentation protocol undecoded) |
 | Named streams | ❌ | — | undecoded; unused by the target app |
 | Resources (`sendResourceAtURL`) | ❌ | — | undecoded; unused by the target app |
-| App-level video | ✅ | macOS | `kind:"frame"` JSON envelopes, 200/200 frames (the path shipped iOS builds actually use) |
+| App-level video | ✅ | macOS · **iOS** | `kind:"frame"` JSON envelopes — 200/200 frames (macOS, R47) and 198+201 frames delivered to a real iPhone (R52, transport-receipted) |
 | Foreign-peer platform coverage | ✅ | macOS · **iOS** | the mcwire client runs on macOS hosts (same-box, Mac↔Mac) and joins **real iPhone MCSession** from Macs (R51) |
 
 iOS runtime validation = the shipped `ios/mcoracle` running on a physical

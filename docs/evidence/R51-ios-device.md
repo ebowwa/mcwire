@@ -74,3 +74,17 @@ The iPhone's connect blob is **121B** vs the Mac oracle's 89B — iOS carries
 more interface addresses in its ConnectionData. The session completes
 without special-casing; the size delta is a fresh ground-truth data point
 for the address-segment grammar (recorded in `docs/d0xx-tls.md` R51).
+---
+
+## Addendum (R52): video frames to the device
+
+Two back-to-back evening runs (mcwire on a second office Mac → the same
+iPhone oracle, fresh instance): DTLS handshake complete + JSON channel up
+both times, and the self-generated video stream delivered — **198 and 201
+`kind:"frame"` envelopes** (5 distinct ~1KB JPEGs at 5fps, each a 1470B
+d0xx record to the phone's data port). The phone's oracle UI showed the
+sessions Connected throughout (user-verified); the foreign frames are
+receipted at the framework's transport layer and do not surface as
+app-level `didReceive` callbacks — the documented quench frontier
+(`docs/d0xx-tls.md` R42/R50/R52). Frame generation is self-contained
+(`mc/dtls.py` `_gen_test_jpegs`, macOS `sips`, no external files).
