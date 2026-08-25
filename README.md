@@ -6,7 +6,9 @@ non-Apple client can join sessions of an unmodified macOS/iOS app** that uses
 
 MC has no documented wire protocol. This project derives it byte-for-byte
 from packet captures and live probing, and proves each layer by speaking it
-back to the real framework — success is measured **in the Apple peer's own
+back to the real framework. How the public API maps onto that hidden wire —
+and how much of it the foreign client covers — is laid out in
+[`docs/api-vs-wire.md`](docs/api-vs-wire.md) — success is measured **in the Apple peer's own
 logs**, up to and including the app-level verdict:
 **MCSession: changed state from [Connecting] to [Connected]** for this
 foreign peer.
@@ -128,6 +130,9 @@ mc/                the foreign client (pure Python, macOS host)
 docs/
   mc-protocol.md   byte-level spec — TCP handshake + plaintext UDP plane
   d0xx-tls.md      encrypted plane + the full RE crack log (round by round)
+  api-vs-wire.md   the public MultipeerConnectivity API mapped to what
+                   actually crosses the wire, with a coverage evaluation
+                   of the foreign client vs the full API surface
 tools/             capture + analysis harnesses, plus gckdtls.swift — the
                    SSLContext bridge (d0 envelope <-> DTLS record) whose
                    binary Apple's stack runs the crypto in
