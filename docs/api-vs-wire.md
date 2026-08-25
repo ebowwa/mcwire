@@ -76,20 +76,26 @@ the API (README gotchas; R32/R45).
 
 ## 3. Coverage: the public API vs. what mcwire speaks
 
-| API capability | mcwire status | Notes |
-|---|---|---|
-| Discover (advertise role) | ✅ | zeroconf advertiser; found+parsed by real `MCNearbyServiceBrowser` |
-| Discover (browse role) | ✅ | browses, dials, completes invite flow — invitation **accepted by real apps** |
-| Join session, reach `connected` (`.optional`) | ✅ | full stack; app-side verdict logged (R41, R48–R51) |
-| Join session (`.none`) | 🟡 mapped | plane fully decoded; end-to-end foreign Connected proven on `.optional` |
-| Join session (`.required`) | 🟡 partial | identity-handshake grammar covered by the `mcpeer --required` oracle |
-| `sendData` reliable | ✅ | c105 + byte-exact acks; our JSON envelopes arrive and are receipted at the transport layer |
-| `sendData` unreliable | 🟡 | mapped in the plaintext plane |
-| Payload ≥ ~4KB / fragmentation | ❌ | open (Apple's fragmentation protocol undecoded) |
-| Named streams | ❌ | undecoded; unused by the target app |
-| Resources (`sendResourceAtURL`) | ❌ | undecoded; unused by the target app |
-| App-level video | ✅ | `kind:"frame"` JSON envelopes, 200/200 frames (the path shipped iOS builds actually use) |
-| Platform coverage as the foreign peer | ✅ | macOS host (same-box, Mac↔Mac) and joins **real iPhone MCSession** from Macs (R51) |
+| API capability | mcwire status | Validated live on | Notes |
+|---|---|---|---|
+| Discover (advertise role) | ✅ | macOS · **iOS** | zeroconf advertiser; found+parsed by real `MCNearbyServiceBrowser`; the iPhone oracle's Bonjour record was browsed from Macs (R51) |
+| Discover (browse role) | ✅ | macOS | browses, dials, completes invite flow — invitation **accepted by real apps** |
+| Join session, reach `connected` (`.optional`) | ✅ | macOS · **iOS** | full stack; app-side verdict logged (R41, R48–R51); the iPhone oracle showed `state connected peers=["PYSRV"]` on its own screen (R51) |
+| Join session (`.none`) | 🟡 mapped | macOS oracle | plane fully decoded; end-to-end foreign Connected proven on `.optional` |
+| Join session (`.required`) | 🟡 partial | macOS oracle | identity-handshake grammar covered by the `mcpeer --required` oracle |
+| `sendData` reliable | ✅ | macOS · **iOS** | c105 + byte-exact acks; the iPhone's hello/ping envelopes decoded at the foreign peer and acked (R51); our envelopes receipted at the transport layer |
+| `sendData` unreliable | 🟡 | — | mapped in the plaintext plane |
+| Payload ≥ ~4KB / fragmentation | ❌ | — | open (Apple's fragmentation protocol undecoded) |
+| Named streams | ❌ | — | undecoded; unused by the target app |
+| Resources (`sendResourceAtURL`) | ❌ | — | undecoded; unused by the target app |
+| App-level video | ✅ | macOS | `kind:"frame"` JSON envelopes, 200/200 frames (the path shipped iOS builds actually use) |
+| Foreign-peer platform coverage | ✅ | macOS · **iOS** | the mcwire client runs on macOS hosts (same-box, Mac↔Mac) and joins **real iPhone MCSession** from Macs (R51) |
+
+iOS runtime validation = the shipped `ios/mcoracle` running on a physical
+iPhone 13 mini (iPhone14,4): its Bonjour record browsed, its invitation
+accepted, its session Connected (verdict on the device's own UI), and its
+`hello`/`ping` envelopes decrypted + acked by the foreign client — from two
+different Macs (R51).
 
 Bottom line: for the parts of the API a chat/video-style app actually uses —
 discovery, invitation, session establishment, reliable JSON/data envelopes —
@@ -101,7 +107,10 @@ precisely the surface the target app doesn't use either.
 
 ## 4. Method note
 
-The API column is quoted from the SDK headers (public, stable since 2013).
+The API column is quoted from the SDK headers — verified **byte-identical**
+between the MacOSX 26.5 and iPhoneOS 26.5 SDKs (`MCSession.h`,
+`MCNearbyServiceAdvertiser.h`, `MCNearbyServiceBrowser.h`, `MCPeerID.h`,
+`MCError.h`; one shared API since iOS 7 / macOS 10.10).
 The wire column comes exclusively from this repo's captures and live
 probing: ~53 annotated session datagrams (`mc/templates/d0xx/`), the
 byte-exact TCP templates (`mc/templates/tcp-clipair/`), and 51 rounds of
