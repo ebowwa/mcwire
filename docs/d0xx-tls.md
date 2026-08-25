@@ -1784,3 +1784,42 @@ cross-machine session, run to validate the repo as it will be published:
 No code changes were needed for this run; it confirms the R45–R48 stack on the
 current LAN after the release-prep edits (docs sync + IP redaction + the
 plists.py fallback swap).
+
+## Round 50 — 🎯 SELF-CONTAINED PROOF: the shipped oracle (mcoracle)
+
+### What changed
+- `Sources/mcoracle`: a minimal, dependency-free macOS oracle reproducing the
+  target channel's exact MC configuration — MCSession `.optional` + nil
+  security identity, symmetric advertise+browse, identity `discoveryInfo`,
+  accept-all invitations, hello envelope on connect, 2s auto-ping. No app
+  code involved anywhere.
+- `mc/mdns.py`: multi-interface address selection. mDNSResponder registers
+  the advertiser's host with an A record per interface (loopback,
+  self-assigned link-local from disconnected NICs, VPN, LAN) and the old
+  first-record pick dialed 127.0.0.1 / 169.254.x — the session attached but
+  the peer's GCK bound loopback and stopped ICE (the R48/R49 office
+  environment failure). Selection now: same subnet as our address > private
+  routable > public > link-local > loopback.
+- `mc/dtls.py`: the video streamer selects only JPEGs within the ~2.7KB
+  receive budget and skips oversized sources instead of dying on
+  "dtls message too big".
+
+### The proof (all from shipped components only)
+- Same-host (the Air): mcoracle up; mcwire browser joined — DTLS handshake
+  complete, c1xx identity complete, JSON channel up, the oracle's hello
+  envelope decoded at the foreign peer. Oracle's own delegate verdict:
+  `state connected peers=["PYSRV"]` + `→ CONNECTED peer=PYSRV`. Framework
+  log: `Sending 78 bytes of data to participant …` (its ping envelopes to
+  the foreign peer) every 2s.
+- Cross-machine: mcoracle on the 16GB Air ↔ mcwire browser on the 8GB Air
+  over the office LAN — the same full stack and the same Connected verdict
+  on the oracle side (foreign peer `PYSRV`).
+- `tools/verify-session.sh` now drives mcoracle and asserts 13 markers across
+  BOTH sides (the foreign stack walk + the app-side Connected verdict):
+  **PASS, 13/13**.
+
+### What this removes
+The headline claim — a foreign, non-Apple client joins a real MCSession — is
+now reproducible with nothing but this repo (`swift build` + one script).
+The production app channel remains the original field target; mcoracle
+speaks the identical wire surface with zero private dependencies.

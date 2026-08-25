@@ -11,8 +11,8 @@ logs**, up to and including the app-level verdict:
 **MCSession: changed state from [Connecting] to [Connected]** for this
 foreign peer.
 
-> **Status snapshot (R46–R49) — 100% reliable same-host; Mac-to-Mac
-> proven.** The
+> **Status snapshot (R46–R50) — 100% reliable same-host; Mac-to-Mac
+> proven; proof fully self-contained (R50).** The
 > whole stack works end-to-end against the unmodified app **4/4 consecutive
 > runs** (anonymous DTLS ✓, JSON both directions ✓, the app's own log
 > reporting `Connected` ✓), including against a FRESH app instance (the
@@ -23,7 +23,10 @@ foreign peer.
 > published tree (R49):** mcwire (browser) on one office Mac ↔ the real
 > `MultipeerChannel` (`secondsee-mpc`, `.optional`) on another, full session
 > over the LAN — Connected + JSON both directions.
-> **Video proven sustained (R47): 200/200 frames
+> **R50: the proof is self-contained** — the shipped
+> `mcoracle` (real MCSession, no app code) + `tools/verify-session.sh`
+> reproduce the full Connected session with this repo alone, same-host and
+> cross-machine. **Video proven sustained (R47): 200/200 frames
 > delivered** — 5 distinct JPEGs cycling at 5fps as `kind:"frame"`
 > envelopes, the app's MCSession logging a receipt for every one. Working
 > frame budget: JPEGs ≤~2.7KB (bigger single records are silently dropped
@@ -32,21 +35,26 @@ foreign peer.
 
 ## Proof
 
-- **`docs/evidence/R49-live-session.md`** — verbatim record of a live
-  Mac-to-Mac session (2026-08-24): mcwire (browser) on one office Mac joined a
-  real `.optional` `MultipeerChannel` on another — DTLS handshake complete,
-  c1xx identity complete, the app's own `kind:"hello"` JSON arrived at the
-  foreign peer, 36k+ acks flowed back, and the framework's own GCKSession log
-  shows the foreign participant as a full routing-table member.
-- **`tools/verify-session.sh`** — one-command self-check with only this
-  repo's components: builds `mcpeer`, drives the full foreign-stack walk
-  (discovery → TCP browser flow → plists → ICE start), and asserts each
-  marker. `RESULT: PASS` is reproduced on any macOS box.
+- **`tools/verify-session.sh`** — the one-command, fully self-contained
+  proof: builds the shipped `mcoracle` (a real `MCSession` `.optional`
+  channel, zero app code), runs mcwire as the foreign browser against it,
+  and asserts **13 markers on both sides** — the foreign stack (discovery →
+  TCP browser flow → ICE → DTLS handshake complete → c1xx identity → JSON
+  channel up, the oracle's hello envelope decoded) AND the oracle's own
+  verdict (`state connected` / `→ CONNECTED peer=PYSRV`). Verified
+  same-host and cross-machine (two physical Macs over the LAN).
+- **`docs/evidence/R50-self-contained.md`** — verbatim logs of the
+  self-contained run above.
+- **`docs/evidence/R49-live-session.md`** — the earlier field record against
+  the production app channel: DTLS complete, the app's own `kind:"hello"`
+  JSON at the foreign peer, 36k+ acks back, and the framework's GCKSession
+  log showing the foreign participant as a full routing-table member.
 
 Run the self-check:
 
 ```sh
-./tools/verify-session.sh mc-probe      # uses shipped mcpeer oracle
+swift build
+./tools/verify-session.sh             # 13/13 PASS = full Connected proof
 ```
 
 ## Status
@@ -119,6 +127,9 @@ tools/             capture + analysis harnesses, plus gckdtls.swift — the
                    binary Apple's stack runs the crypto in
 Sources/mcpeer/    macOS MC CLI oracle: advertise/browse/session with
                    controlled payloads (Swift, links real MultipeerConnectivity)
+Sources/mcoracle/  the self-contained proof oracle: a real .optional
+                   MCSession channel (advertise+browse, accept-all, hello
+                   envelope, auto-ping) — drives tools/verify-session.sh
 ```
 
 Packet captures are **not shipped**, and LAN addresses in docs/templates are

@@ -222,17 +222,26 @@ def _start_video(sock, dst, st, eng, ch):
     fps = float(__import__("os").environ.get("MC_VIDEO_FPS", "5"))
 
     # frame sources in priority order: explicit env list, then any real JPEGs
+    # (only files inside the app's receive budget — bigger records are
+    # silently dropped by the peer's receive layer; R47)
+    budget = 2700
     paths = []
     env_list = __import__("os").environ.get("MC_VIDEO_FRAMES", "")
     if env_list:
         paths = [p for p in env_list.split(":") if __import__("os").path.isfile(p)]
     if not paths:
+        import os as _os
         for pat in ("~/Downloads/*.jpg", "~/Desktop/*.jpg",
                     "~/Pictures/*.jpg"):
-            paths += _glob.glob(__import__("os").path.expanduser(pat))
+            for p in _glob.glob(__import__("os").path.expanduser(pat)):
+                try:
+                    if _os.path.getsize(p) <= budget:
+                        paths.append(p)
+                except OSError:
+                    pass
     paths = paths[:12]
     if not paths:
-        print("[video] no frame sources found")
+        print("[video] no frame sources found (need JPEGs <= %dB)" % budget)
         return
 
     def read_jpeg(p):
@@ -254,6 +263,9 @@ def _start_video(sock, dst, st, eng, ch):
         while sent < 200:                     # ~40s at 5fps
             jpeg = read_jpeg(paths[state["i"] % len(paths)])
             state["i"] += 1
+            if jpeg and len(jpeg) > 3000:
+                print(f"[video] skipping {len(jpeg)}B source (over the ~2.7KB receive budget)")
+                jpeg = None
             if jpeg:
                 payload = base64.b64encode(jpeg).decode()
                 frame = {"v": 1, "id": f"frame-{sent:04d}", "kind": "frame",

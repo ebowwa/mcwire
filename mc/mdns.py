@@ -92,10 +92,43 @@ def browse_target(exclude_inst, exclude_display, timeout=15, service_type=None):
             break
     if not target:
         return None, None, None, zc
-    addr = socket.inet_ntoa(target.addresses[0])
+    addr = _best_addr(target.addresses)
     s = socket.create_connection((addr, target.port), timeout=8)
     print(f"[mc] connected to advertiser {addr}:{target.port} ({target.name})")
     return s, target.name, target.properties, zc
+
+
+def _best_addr(addrs):
+    """Pick the most reachable IPv4 from a multi-address mDNS registration.
+
+    mDNSResponder registers the advertiser's host with an A record per
+    interface, and their order is arbitrary: on multi-interface hosts
+    (loopback, disconnected NICs with self-assigned 169.254.x, VPNs, plus the
+    real LAN) the first record is routinely loopback or link-local, and
+    dialing it strands the session (the peer's GCK then never validates ICE —
+    the R48/R49 office-environment failure). Prefer an address on our own
+    LAN subnet, then any private routable one, and only fall back to
+    loopback/link-local when nothing else exists."""
+    import ipaddress
+
+    def score(b):
+        try:
+            ip = ipaddress.ip_address(socket.inet_ntoa(b))
+        except OSError:
+            return -1
+        if ip.is_loopback:
+            return 0
+        if ip.is_link_local:
+            return 1
+        try:  # same subnet as our own address = best
+            mine = ipaddress.ip_address(env.MY_IP)
+            if ip != mine and int(ip) >> 24 == int(mine) >> 24:
+                return 4
+        except OSError:
+            pass
+        return 2 if ip.is_private else 3
+
+    return socket.inet_ntoa(max(addrs, key=score))
 
 
 def inst_from_token(token8):

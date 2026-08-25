@@ -2,13 +2,21 @@
 import PackageDescription
 
 let package = Package(
-    name: "mcpeer",
+    name: "mcwire-oracle",
+    platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
             name: "mcpeer",
             linkerSettings: [
                 .linkedFramework("MultipeerConnectivity"),
             ]
-        )
+        ),
+        .executableTarget(
+            name: "mcoracle",
+            linkerSettings: [
+                .linkedFramework("MultipeerConnectivity"),
+                .linkedFramework("AppKit"),
+            ]
+        ),
     ]
 )
