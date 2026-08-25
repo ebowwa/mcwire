@@ -11,8 +11,8 @@ logs**, up to and including the app-level verdict:
 **MCSession: changed state from [Connecting] to [Connected]** for this
 foreign peer.
 
-> **Status snapshot (R46–R50) — 100% reliable same-host; Mac-to-Mac
-> proven; proof fully self-contained (R50).** The
+> **Status snapshot (R46–R51) — 100% reliable same-host; Mac-to-Mac and
+> Mac-to-iPhone-device proven; proof fully self-contained (R50/R51).** The
 > whole stack works end-to-end against the unmodified app **4/4 consecutive
 > runs** (anonymous DTLS ✓, JSON both directions ✓, the app's own log
 > reporting `Connected` ✓), including against a FRESH app instance (the
@@ -26,7 +26,10 @@ foreign peer.
 > **R50: the proof is self-contained** — the shipped
 > `mcoracle` (real MCSession, no app code) + `tools/verify-session.sh`
 > reproduce the full Connected session with this repo alone, same-host and
-> cross-machine. **Video proven sustained (R47): 200/200 frames
+> cross-machine. **iOS device proven (R51):** the same foreign client
+> joined a real iPhone MCSession (`ios/mcoracle` on an iPhone 13 mini) —
+> full stack + Connected verdict on the phone's own screen, from two
+> different Macs. **Video proven sustained (R47): 200/200 frames
 > delivered** — 5 distinct JPEGs cycling at 5fps as `kind:"frame"`
 > envelopes, the app's MCSession logging a receipt for every one. Working
 > frame budget: JPEGs ≤~2.7KB (bigger single records are silently dropped
@@ -45,6 +48,9 @@ foreign peer.
   same-host and cross-machine (two physical Macs over the LAN).
 - **`docs/evidence/R50-self-contained.md`** — verbatim logs of the
   self-contained run above.
+- **`docs/evidence/R51-ios-device.md`** — the iOS-device proof: mcwire
+  joined a real iPhone MCSession (shipped `ios/mcoracle`, iPhone 13 mini),
+  same-Mac and cross-Mac; the phone's own UI shows the Connected verdict.
 - **`docs/evidence/R49-live-session.md`** — the earlier field record against
   the production app channel: DTLS complete, the app's own `kind:"hello"`
   JSON at the foreign peer, 36k+ acks back, and the framework's GCKSession
@@ -130,6 +136,8 @@ Sources/mcpeer/    macOS MC CLI oracle: advertise/browse/session with
 Sources/mcoracle/  the self-contained proof oracle: a real .optional
                    MCSession channel (advertise+browse, accept-all, hello
                    envelope, auto-ping) — drives tools/verify-session.sh
+ios/               the same oracle as an iOS app (xcodegen project) — the
+                   device-side proof: mcwire joins a real iPhone MCSession
 ```
 
 Packet captures are **not shipped**, and LAN addresses in docs/templates are

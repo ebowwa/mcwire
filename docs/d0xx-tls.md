@@ -1823,3 +1823,44 @@ The headline claim — a foreign, non-Apple client joins a real MCSession — is
 now reproducible with nothing but this repo (`swift build` + one script).
 The production app channel remains the original field target; mcoracle
 speaks the identical wire surface with zero private dependencies.
+
+## Round 51 — 🎯📱 iOS DEVICE PROVEN: foreign client joins a real iPhone MCSession
+
+### The missing half, closed
+The repo's claim was always "macOS/iOS app"; only the macOS half had ever
+run against the foreign client (R30 merely watched an iPhone↔Mac session as
+ground truth). R51 closes it: **mcwire joined a real MCSession running on a
+physical iPhone** (iPhone 13 mini, iPhone14,4), end to end.
+
+### What was built
+- `ios/mcoracle`: the self-contained oracle as an iOS app (SwiftUI,
+  xcodegen project). Same channel shape as the macOS oracle: MCSession
+  `.optional` + nil identity, symmetric advertise+browse, identity
+  discoveryInfo, accept-all invitations, hello envelope on connect, 2s
+  auto-ping — plus an on-screen event log (the oracle-side verdict is
+  visible on the device itself). Info.plist carries the required
+  `NSBonjourServices` + `NSLocalNetworkUsageDescription` keys (iOS 14+
+  local-network gate; the user must allow the prompt on first run).
+- Signing/install path recorded in `ios/README.md` (xcodegen + xcodebuild
+  automatic signing; works headless over `devicectl`).
+
+### The proof (2026-08-24, office LAN)
+- Same-Mac: mcwire (browser) on the Air joined the iPhone's advert
+  (`<inst>+iPhone`, token eba77f98453662c2). TCP browser flow → the
+  iPhone's connect plist (**blob 121B — richer than the Mac's 89B**; iOS
+  carries more interface addresses) → ICE → DTLS handshake complete → c1xx
+  identity complete → JSON channel up. The iPhone's hello envelope decoded:
+  `{"platform":"iOS","model":"iPhone14,4","name":"iPhone"}` followed by its
+  2s auto-pings, each ACKed.
+- Cross-machine: mcwire on the 8GB Air joined the same iPhone session —
+  identical full stack over the LAN.
+- Device-side verdict (oracle UI on the phone, user-verified):
+  `● state connected peers=["PYSRV"]` + `→ CONNECTED peer=PYSRV` + the
+  hello/ping lines.
+
+### Notes for the record
+- The iPhone negotiated slower than the Mac oracle (several seconds before
+  ICE validated) — no code change needed, just patience in the harness.
+- The 121B iOS blob is a new ground-truth data point for the
+  address-segment grammar (more interfaces → longer ConnectionData); worth
+  folding into docs/mc-protocol.md when the next blob pass happens.
