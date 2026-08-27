@@ -109,7 +109,8 @@ def _stun_reply(d, who, sock, st):
             nom_resp = bytearray(resp) + struct.pack(">HH", 0x8009, len(cand)) + cand + bytes([0xAA]) * pad
             nom_resp[2:4] = struct.pack(">H", len(nom_resp) - 20)
             sock.sendto(bytes(nom_resp), who)
-            print("[ice] -> nomination answer + 8009")
+            st.nomination_seen = True
+            print("[ice] -> nomination answer + 8009 (ICE concluded)")
 
 
 class IceService(threading.Thread):
@@ -168,14 +169,19 @@ class IceService(threading.Thread):
             return struct.pack(">I", ctr[0])
 
         while not self.stop_flag.is_set():
-            # Stop spraying once the session is established — STUN binding
-            # requests after DTLS lands in the peer's session parser as
-            # "Non-OSPF InvalidDestination", poisoning the adjacency and
-            # forcing a disconnect (R52: the 1Hz spray during the video
-            # stream caused exactly that).
-            if s.dtls.get("handshake_done"):
+            # Stop spraying once ICE has CONCLUDED (we answered the app's
+            # nomination + 8009). Stopping at DTLS-handshake-done was too
+            # early — the app's GCK can still be mid-nomination on its
+            # channel and starving it of checks times out the session
+            # (R52: 'ICE timeout expired ... channel [5] state
+            # [Connecting] -> ForceDisconnect'). Post-ICE STUN would land
+            # in the established session parser as "Non-OSPF
+            # InvalidDestination", so stop exactly now.
+            if (__import__("os").environ.get("MC_SPRAY_STOP")
+                    and getattr(s, "app_data_seen", False)
+                    and getattr(s, "nomination_seen", False)):
                 self.stop_flag.set()
-                print("[ice] session established — spray stopped")
+                print("[ice] session established (app data flowing) — spray stopped")
                 break
             if s.our_tok4 and s.their_tok and (time.time() - s.last_spray) > 1.0:
                 dst = self._spray_target()
@@ -248,6 +254,8 @@ class IceService(threading.Thread):
                 self.last_check = who
                 _stun_reply(d, who, sk, s)
             elif d[:1] == b"\xd0":
+                if d[1] == 0x17 and getattr(s, "our_tok4", None):
+                    s.app_data_seen = True   # first app data = session truly up
                 print(f"[ice] <- d0xx d0{d[1]:02x} {len(d)}B env={d[:14].hex()}")
                 dtls.handle(d, who, sk, s.dtls)
                 if s.dtls.get("handshake_done"):
