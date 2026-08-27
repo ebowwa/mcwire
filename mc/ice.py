@@ -155,7 +155,8 @@ class IceService(threading.Thread):
 
     def run(self):
         s = self.session
-        socks = {p: self._bind(p) for p in (plists.OUR_ICE_PORT, plists.OUR_ALT_PORT)}
+        ports = (plists.OUR_ICE_PORT, plists.OUR_ALT_PORT, plists.PEER_STD_PORT)
+        socks = {p: self._bind(p) for p in ports}
         print(f"[ice] bound ports: {sorted(socks.keys())}")
         # 8004: per-sender evolving counter (capture shows it advancing per
         # emitted packet; responses echo the request's value verbatim)
@@ -167,6 +168,15 @@ class IceService(threading.Thread):
             return struct.pack(">I", ctr[0])
 
         while not self.stop_flag.is_set():
+            # Stop spraying once the session is established — STUN binding
+            # requests after DTLS lands in the peer's session parser as
+            # "Non-OSPF InvalidDestination", poisoning the adjacency and
+            # forcing a disconnect (R52: the 1Hz spray during the video
+            # stream caused exactly that).
+            if s.dtls.get("handshake_done"):
+                self.stop_flag.set()
+                print("[ice] session established — spray stopped")
+                break
             if s.our_tok4 and s.their_tok and (time.time() - s.last_spray) > 1.0:
                 dst = self._spray_target()
                 if self.last_check:
@@ -238,7 +248,7 @@ class IceService(threading.Thread):
                 self.last_check = who
                 _stun_reply(d, who, sk, s)
             elif d[:1] == b"\xd0":
-                print(f"[ice] <- d0xx d0{d[1]:02x} {len(d)}B")
+                print(f"[ice] <- d0xx d0{d[1]:02x} {len(d)}B env={d[:14].hex()}")
                 dtls.handle(d, who, sk, s.dtls)
                 if s.dtls.get("handshake_done"):
                     # the SSLContext bridge owns the transcript (it records

@@ -282,7 +282,7 @@ def _start_video(sock, dst, st, eng, ch):
                          "payload": payload}
                 with send_lock:
                     try:
-                        payload = ch.send_json(frame, counter=_ctr(), acked=0)
+                        payload = ch.send_json(frame)   # live stream algebra
                         recs = eng.send_plain(payload)
                     except Exception as ex:
                         print(f"[video] engine error: {ex}")
@@ -297,12 +297,6 @@ def _start_video(sock, dst, st, eng, ch):
                 sent += 1
             _t.sleep(1.0 / fps)
         print(f"[video] done: {sent} frames")
-
-    # simple counter progression: the channel's last known counter +4 per frame
-    base = {"c": 0x02000000}
-    def _ctr():
-        base["c"] += 4
-        return base["c"]
 
     _th.Thread(target=loop, daemon=True).start()
 
@@ -362,7 +356,9 @@ def _answer_c1xx(sock, dst, st, eng, plain):
             print(f"[app] -> c105 {kind} hex: {out.hex()}")
             for rec in eng.send_plain(out):
                 try:
-                    sock.sendto(b"\xd0" + rec, dst)
+                    env = b"\xd0" + rec
+                    sock.sendto(env, dst)
+                    print(f"[app] -> env {env[:14].hex()}")
                     print(f"[app] -> c105 {kind} {len(out)}B (encrypted)")
                 except OSError:
                     pass

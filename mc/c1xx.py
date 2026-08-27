@@ -45,6 +45,37 @@ def _finish(p: bytearray) -> bytes:
     return bytes(p)
 
 
+def keepalive_answer(d: bytes, our_tok8: bytes, our_pid4: bytes,
+                     peer_pid4: bytes, our_name: str = "PYSRV") -> bytes:
+    """Answer a c10a GCK Hello/heartbeat (the ~6s adjacency liveness frame).
+
+    Observed inbound layout (R52, live): a c105-shaped frame whose tail is
+        a8 0000 1e <sender-token[0:4]> <sender-pid4> <namelen><sender-name>
+    Real peers answer each other's beacons; leaving them unanswered lets the
+    GCK adjacency dead-timer expire -> our participant routes as
+    InvalidDestination and DATA never surfaces app-level (the R52 A/B:
+    identical frames, delivery only for the peer that answers).
+
+    Our answer: mirror the composites, swap the sender-identity TLV to ours,
+    carry OUR display name."""
+    m = bytearray(mirror(bytes(d), our_pid4, peer_pid4))
+    # sender identity TLV: a8 0000 1e <tok4> <pid4>  (mirror already swapped pid4)
+    i = m.find(bytes.fromhex("a800001e"))
+    if i >= 0 and i + 12 <= len(m):
+        m[i + 4:i + 8] = our_tok8[:4]
+    # trailing name TLV: <nlen><ascii name> — parse the ascii run from the end
+    end = len(m)
+    while end > 0 and 0x20 <= m[end - 1] <= 0x7E:
+        end -= 1
+    if 0 < end < len(m):
+        nlen_pos = end - 1
+        old_len = m[nlen_pos]
+        if old_len == len(m) - end:          # sanity: length byte matches
+            name = our_name.encode()
+            m[nlen_pos:] = bytes([len(name)]) + name
+    return _finish(m)
+
+
 def hello(our_tok8: bytes) -> bytes:
     """c101 — our identity hello (mirrors theirs)."""
     p = bytearray()
@@ -148,6 +179,12 @@ class Responder:
         elif sub == 0x08:
             # c108 keepalive/query (20B): mirror it back
             out.append(mirror(d, self.our_pid4, self.peer_pid4))
+        elif sub == 0x0a:
+            # c10a GCK Hello heartbeat (the ~6s adjacency beacon, carries the
+            # sender's name) — answer as ourselves or the adjacency dies and
+            # our data routes as InvalidDestination (R52)
+            out.append(keepalive_answer(d, self.our, self.our_pid4,
+                                        self.peer_pid4))
         elif sub == 0x04:
             self.complete = True
         return out

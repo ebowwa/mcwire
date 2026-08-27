@@ -129,14 +129,27 @@ class Envelopes:
 
 
 class Channel:
-    """Glue: c105 frames in/out over the DTLS engine, JSON payloads up."""
+    """Glue: c105 frames in/out over the DTLS engine, JSON payloads up.
+
+    Stream algebra (decoded from a live peer's frame sequence, R52):
+      acked    = count of PEER data frames WE have received (byte0 << 24),
+                 advanced in the next frame we send
+      counter  = 02 | (our round & 0xff) << 16 | 4 * (our NEW-frame count
+                 including this one)   -- byte3 is the cumulative transmit
+                 count: retransmits refresh it to the current global value
+      Every NEW data frame must carry a FRESH counter — two different
+      payloads with the same counter look like a corrupted retransmit and
+      are dropped silently by the peer's reliable layer (the R52
+      video-drop root cause: the reply echoed the peer's counter and the
+      streamer restarted at the same value)."""
+    CONST_COUNTER_HI = 0x02
 
     def __init__(self, our_c8, peer_c8, envelopes=None):
         self.our = our_c8
         self.peer = peer_c8
         self.env = envelopes or Envelopes()
-        self.counter = 4           # app's first data used 02000004; ours from 4
-        self.acked = 0
+        self.tx_new = 0            # NEW data frames we have sent
+        self.rx_count = 0          # peer data frames we have received
         self.last_json = None
 
     def on_data(self, d: bytes):
@@ -151,28 +164,29 @@ class Channel:
         if not parsed:
             return out
         counter, payload = parsed
-        self.acked = int.from_bytes(d[28:32], "big")
-        self.counter = counter
+        self.rx_count += 1
         out.append(ack(self.our, d))
         try:
             obj = json.loads(payload.decode("utf-8", "replace"))
             self.last_json = obj
             reply = self.env.on_json(obj)
             if reply:
-                # LOCKSTEP (real pair, verified): the reply DATA in round N
-                # carries THE SAME acked/ctr as the received DATA (both sides
-                # emit 02000004 in round 1) — only the ACK advances (+4).
-                # Rounds advance when both peers have NEW data to send.
-                out.append(self.send_json(
-                    reply, acked=int.from_bytes(d[28:32], "big"),
-                    counter=int.from_bytes(d[32:36], "big"),
-                    nonce=int.from_bytes(d[18:20], "big")))   # round nonce
+                # The reply is OUR next NEW data frame: fresh monotonic
+                # counter, acked = how many of THEIR frames we've received.
+                out.append(self.send_json(reply,
+                                          nonce=int.from_bytes(d[18:20], "big")))
         except (ValueError, AttributeError):
             pass                    # binary payload (video etc.) — ack only
         return out
 
     def send_json(self, obj, acked=None, counter=None, nonce: Optional[int] = None) -> bytes:
+        """Originates a NEW data frame. acked/counter default to the live
+        stream algebra (override only for experiments)."""
         payload = json.dumps(obj, separators=(",", ":")).encode()
-        return data(self.our, self.peer, payload,
-                    counter if counter is not None else self.counter + 4,
-                    acked if acked is not None else self.acked, nonce=nonce)
+        if counter is None:
+            counter = (self.CONST_COUNTER_HI << 24) | ((self.tx_new & 0xFF) << 16) \
+                      | (4 * (self.tx_new + 1))
+        if acked is None:
+            acked = (self.rx_count & 0xFF) << 24
+        self.tx_new += 1
+        return data(self.our, self.peer, payload, counter, acked, nonce=nonce)

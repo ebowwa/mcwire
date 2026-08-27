@@ -22,6 +22,8 @@ _TPL_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates",
 # UDP listener ports (see docs/mc-protocol.md): the GCK/ICE plane.
 OUR_ICE_PORT = 16401   # 0x4011 little-endian = 11 40 in the blob
 OUR_ALT_PORT = 16629   # outside Apple's shared 16397-16402 GCK port allocator
+PEER_STD_PORT = 16402  # where REAL peers listen (R30: pairs exchange 16402<->16402);
+                       # held so the peer's GCK/OSPF channel finds a listener there
 
 
 def _load_blob(fname):
