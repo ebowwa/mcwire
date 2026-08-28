@@ -1947,3 +1947,25 @@ stale mDNS records linger ~25s after kills; multiple simultaneous adverts
 (including the production app) contend for the browser — exactly one
 oracle on the network is the working configuration (4/4 tonight when it
 held).
+
+### R53 — the spray-stop regression found & fixed; delivery frontier confirmed on a 5-min stable session
+- The unconditional post-handshake spray-stop (R52) was WRONG: the app's
+  GCK is often still mid-nomination when DTLS completes; cutting checks
+  starved it -> "ICE timeout expired ... channel [5] state [Connecting]
+  -> ForceDisconnect" (reproduced on two Macs). Correct trigger = after
+  WE answer the app's nomination + 8009, and ideally after first in-tunnel
+  app data. Now env-gated (MC_SPRAY_STOP=1); default = continuous spray
+  (the proven R41-R51 behavior).
+- Clean-session result with the full fix stack (stream algebra + c10a
+  answers + correct spray): Connected held 5+ minutes on the iPhone oracle
+  (user present, app foregrounded, no disconnects), 199 video frames
+  delivered to the device, JSON channel up. Transport consumed everything.
+- App-level delivery verdict re-confirmed on the CLEAN session: the
+  phone's oracle UI shows Connected + its own ping sends, but 0 didReceive
+  for foreign frames — while in the same lab the iPhone's frames deliver
+  to the Mac oracle 227x. The frontier is real and now precisely
+  characterized: frames byte-identical, transport consumes, adjacency
+  completes, app callback never fires. Next lever: DYLD-hook the MAC
+  oracle's framework in-process to trace the delivery decision for our
+  frames vs a real peer's (R33 hook technique) — on-device is opaque, the
+  Mac is hookable.
