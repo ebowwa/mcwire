@@ -1969,3 +1969,37 @@ held).
   oracle's framework in-process to trace the delivery decision for our
   frames vs a real peer's (R33 hook technique) — on-device is opaque, the
   Mac is hookable.
+
+### R53 addendum — THE DELIVERY WALL PINPOINTED (runtime hook evidence)
+
+Rebuilt the R9-era DYLD hook (tools/MCHook2.m, shipped) against the private
+`MCNearbyDiscoveryPeerConnection` class and ran the Mac oracle under it with
+the full method list dumped at runtime. The class exposes the entire data
+path: connectToNetService:, connectedHandler, attachInputStream:outputStream:,
+syncAppendDataToSend:, syncSendMessage:data:withCompletionHandler:,
+syncSendMessageReceipt:sequenceNumber:, syncProcessMessage:data:sequenceNumber:,
+syncReceivedData:error:, syncReadFromInputStream, shouldDecideAboutConnection.
+
+Findings, live (foreign PYSRV session, stream-algebra-fixed frames):
+
+1. Our hello DISPATCHES fine at the MC layer: `PROC msg=2000 seq=0` (the
+   internal taxonomy: 2000=hello, 2100=plists, 2200=accept). Receipts and
+   plist exchange proceed — the framework is fully conversational.
+2. `shouldDecideAboutConnection` returns NO for us (YES for real peers) —
+   and forcing it YES via the hook does NOT unlock delivery: the decision is
+   taken once at hello-time and is not the operative gate.
+3. THE WALL: `attachInputStream:outputStream:` attaches the peer's NSStream
+   pair normally; the framework then POLLS it (`syncReadFromInputStream`)
+   and reads **0 bytes, every time**. The GCK layer never pumps our
+   decrypted-and-acked data into the attached stream. For a real peer the
+   pump runs (data -> stream -> didReceive). The pump's start is gated by
+   the framework-internal attach completion (R38's "single internal attach
+   step") — which no wire-visible byte satisfies, and which the decision
+   override does not satisfy either.
+
+Conclusion: app-level delivery for a foreign peer requires completing the
+framework-internal attach, which is not observable or satisfiable from the
+wire. The hook infrastructure (tools/MCHook2.m) now makes this layer
+inspectable on the Mac for any future angle (e.g., diffing attach-state
+ivars between a real and foreign PeerConnection instance, or hooking the
+GCK stream-write function if a symbol surfaces).
